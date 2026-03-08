@@ -1,0 +1,41 @@
+import streamlit as st
+import numpy as np
+import pandas as pd
+from datetime import datetime
+
+st.title("🛥️ SAR Submarine Wake Detector")
+st.write("Enter SAR measurements → Get submarine type & position")
+
+lambda_iw = st.number_input("Internal wave λ_iw (m)", 1000, 2500, 1500)
+eta_mod = st.number_input("Modulation η_mod (m)", 0.1, 1.0, 0.5)
+lat = st.number_input("SAR center latitude", -90.0, 90.0, 15.0)
+lon = st.number_input("SAR center longitude", -180.0, 180.0, 75.0)
+
+if st.button("🚀 DETECT SUBMARINE"):
+    # Calculations (same as before)
+    N_typical, h_thermo, rho = 0.015, 100, 1025
+    U_est = 5 * np.sqrt((eta_mod * N_typical**2 * h_thermo) / (rho/1000))
+    S_est = lambda_iw / 20 + np.random.normal(0, 15)
+    dist_proxy_km = lambda_iw / 100
+    pos_lat = lat - dist_proxy_km * np.cos(np.radians(45)) / 111
+    pos_lon = lon - dist_proxy_km * np.sin(np.radians(45)) / 111
+    
+    if S_est < 115:
+        sub_type = "Type 093 (SSN)"
+    elif S_est < 140:
+        sub_type = "Type 094 (SSBN)"
+    else:
+        sub_type = "Type 095 (SSN)"
+    
+    conf = max(0, min(100, 100 - abs(S_est - 120) * 0.8))
+    
+    st.success(f"**Submarine:** {sub_type}")
+    st.success(f"**Speed:** {U_est:.1f} knots")
+    st.success(f"**Size:** {S_est:.0f} m")
+    st.success(f"**Position:** {pos_lat:.4f}°N, {pos_lon:.4f}°E")
+    st.success(f"**Confidence:** {conf:.0f}%")
+    
+    # Download CSV
+    results = pd.DataFrame([{'lambda_iw': lambda_iw, 'sub_type': sub_type, 'position': f"{pos_lat:.4f},{pos_lon:.4f}"}])
+    csv = results.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download Results", csv, f"detection_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", "text/csv")
